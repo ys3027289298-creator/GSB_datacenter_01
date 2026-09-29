@@ -50,6 +50,45 @@ class TestCore(unittest.TestCase):
         loaded = core.load_state(core.save_state(state))
         self.assertEqual(loaded["tasks"], ["A", "B"])
 
+    def test_09_illegal_command_rejected(self):
+        state = core.new_game()
+        self.assertEqual(core.handle_command(state, "bogus x"), "非法命令")
+        self.assertEqual(core.handle_command(state, "deploy S1 R1"), "非法命令")
+        self.assertEqual(state["tick"], 0)
+        self.assertEqual(state["servers"], {})
+
+    def test_10_empty_data_loads_defaults(self):
+        loaded = core.load_state("")
+        self.assertEqual(loaded["tasks"], [])
+        loaded = core.load_state("{}")
+        self.assertEqual(loaded["lifespan"], 100)
+        self.assertIn("R1", loaded["racks"])
+
+    def test_11_capacity_boundary(self):
+        state = core.new_game()
+        core.deploy(state, "S1", "R1", 90)
+        self.assertTrue(core.can_add(state, "R1", 10))
+        self.assertFalse(core.can_add(state, "R1", 11))
+        self.assertFalse(core.deploy(state, "S2", "R1", 11))
+        self.assertTrue(core.deploy(state, "S2", "R1", 10))
+        self.assertFalse(core.can_add(state, "R1", 1))
+
+    def test_12_duplicate_inputs_rejected(self):
+        state = core.new_game()
+        self.assertTrue(core.accept_task(state, "T1"))
+        self.assertFalse(core.accept_task(state, "T1"))
+        self.assertEqual(state["tasks"], ["T1"])
+        self.assertFalse(core.cancel_deploy(state, "S9"))
+        self.assertFalse(core.migrate(state, "S9", "R2"))
+
+    def test_13_command_commits_single_change(self):
+        state = core.new_game()
+        core.handle_command(state, "heat")
+        self.assertEqual(state["lifespan"], 99)
+        self.assertEqual(state["tick"], 1)
+        core.handle_command(state, "deploy S1 R1 20")
+        self.assertEqual(state["tick"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()
